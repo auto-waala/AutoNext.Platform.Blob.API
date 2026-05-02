@@ -16,17 +16,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Debug - List project structure
-      shell: powershell
-      run: |
-        Write-Host "Current directory: $(Get-Location)"
-        Write-Host "`nSearching for csproj files..."
-        Get-ChildItem -Recurse -Filter "*.csproj" | Select-Object FullName
-        Write-Host "`nChecking if Blob API folder exists..."
-        Test-Path "AutoNext.Platform.Blob.API"
-        Write-Host "`nListing Blob API folder contents..."
-        Get-ChildItem -Path "AutoNext.Platform.Blob.API" -ErrorAction SilentlyContinue
-
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v3
       with:
@@ -37,7 +26,8 @@ jobs:
 
     - name: Publish API for Development
       run: |
-        dotnet publish AutoNext.Platform.Blob.API\AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
+        # Project file is in root directory, NOT in a subfolder
+        dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
 
     - name: Prepare deployment package
       shell: bash
@@ -111,7 +101,8 @@ EOF
 
     - name: Publish API for Production
       run: |
-        dotnet publish AutoNext.Platform.Blob.API\AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
+        # Project file is in root directory, NOT in a subfolder
+        dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
 
     - name: Prepare deployment package
       shell: bash
@@ -180,6 +171,6 @@ EOF
         sleep 15
         echo ""
         echo "Testing health endpoint:"
-        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "⚠️  Health check pending - application may still be starting"
+        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "⚠️ Health check pending - application may still be starting"
         echo ""
         echo "=========================================="
