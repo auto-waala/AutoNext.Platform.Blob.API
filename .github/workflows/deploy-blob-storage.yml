@@ -1,4 +1,5 @@
 name: Deploy AutoNext.Platform.Blob.API to Dev and Production
+
 on:
   pull_request:
     types: [closed]
@@ -15,6 +16,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Debug - List project structure
+      shell: powershell
+      run: |
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "`nSearching for csproj files..."
+        Get-ChildItem -Recurse -Filter "*.csproj" | Select-Object FullName
+        Write-Host "`nChecking if Blob API folder exists..."
+        Test-Path "AutoNext.Platform.Blob.API"
+        Write-Host "`nListing Blob API folder contents..."
+        Get-ChildItem -Path "AutoNext.Platform.Blob.API" -ErrorAction SilentlyContinue
+
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v3
       with:
@@ -25,35 +37,35 @@ jobs:
 
     - name: Publish API for Development
       run: |
-        dotnet publish AutoNext.Platform.Blob.API/AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
+        dotnet publish AutoNext.Platform.Blob.API\AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
 
     - name: Prepare deployment package
       shell: bash
       run: |
         if [ ! -f "./publish/dev/web.config" ]; then
           cat > ./publish/dev/web.config << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <system.webServer>
-            <handlers>
-              <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
-            </handlers>
-            <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
-            <httpProtocol>
-              <customHeaders>
-                <add name="X-Content-Type-Options" value="nosniff" />
-                <add name="X-Frame-Options" value="DENY" />
-                <add name="X-XSS-Protection" value="1; mode=block" />
-              </customHeaders>
-            </httpProtocol>
-            <security>
-              <requestFiltering>
-                <requestLimits maxAllowedContentLength="104857600" />
-              </requestFiltering>
-            </security>
-          </system.webServer>
-        </configuration>
-        EOF
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+    </handlers>
+    <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
+    <httpProtocol>
+      <customHeaders>
+        <add name="X-Content-Type-Options" value="nosniff" />
+        <add name="X-Frame-Options" value="DENY" />
+        <add name="X-XSS-Protection" value="1; mode=block" />
+      </customHeaders>
+    </httpProtocol>
+    <security>
+      <requestFiltering>
+        <requestLimits maxAllowedContentLength="104857600" />
+      </requestFiltering>
+    </security>
+  </system.webServer>
+</configuration>
+EOF
         fi
         echo "Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > ./publish/dev/deployment-info.txt
 
@@ -99,35 +111,35 @@ jobs:
 
     - name: Publish API for Production
       run: |
-        dotnet publish AutoNext.Platform.Blob.API/AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
+        dotnet publish AutoNext.Platform.Blob.API\AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
 
     - name: Prepare deployment package
       shell: bash
       run: |
         if [ ! -f "./publish/prod/web.config" ]; then
           cat > ./publish/prod/web.config << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <system.webServer>
-            <handlers>
-              <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
-            </handlers>
-            <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
-            <httpProtocol>
-              <customHeaders>
-                <add name="X-Content-Type-Options" value="nosniff" />
-                <add name="X-Frame-Options" value="DENY" />
-                <add name="X-XSS-Protection" value="1; mode=block" />
-              </customHeaders>
-            </httpProtocol>
-            <security>
-              <requestFiltering>
-                <requestLimits maxAllowedContentLength="104857600" />
-              </requestFiltering>
-            </security>
-          </system.webServer>
-        </configuration>
-        EOF
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+    </handlers>
+    <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
+    <httpProtocol>
+      <customHeaders>
+        <add name="X-Content-Type-Options" value="nosniff" />
+        <add name="X-Frame-Options" value="DENY" />
+        <add name="X-XSS-Protection" value="1; mode=block" />
+      </customHeaders>
+    </httpProtocol>
+    <security>
+      <requestFiltering>
+        <requestLimits maxAllowedContentLength="104857600" />
+      </requestFiltering>
+    </security>
+  </system.webServer>
+</configuration>
+EOF
         fi
         echo "Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > ./publish/prod/deployment-info.txt
 
@@ -156,10 +168,18 @@ jobs:
       shell: bash
       run: |
         echo "=========================================="
-        echo "Deployment completed to Windows Shared Server"
+        echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY"
+        echo "=========================================="
+        echo "Environment: Production"
         echo "URL: https://autonext-blob.services.azurewebsites.betalen.in"
         echo "Health Check: https://autonext-blob.services.azurewebsites.betalen.in/health"
         echo "Swagger UI: https://autonext-blob.services.azurewebsites.betalen.in/swagger"
         echo "=========================================="
-        sleep 10
-        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "Health check pending - application may still be starting"
+        echo ""
+        echo "Waiting for application to start..."
+        sleep 15
+        echo ""
+        echo "Testing health endpoint:"
+        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "⚠️  Health check pending - application may still be starting"
+        echo ""
+        echo "=========================================="
