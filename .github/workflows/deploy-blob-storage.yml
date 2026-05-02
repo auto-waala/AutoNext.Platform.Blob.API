@@ -26,7 +26,7 @@ jobs:
 
     - name: Publish API for Development
       run: |
-        # Project file is in root directory, NOT in a subfolder
+        # Project file is in the root directory
         dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
 
     - name: Prepare deployment package
@@ -101,7 +101,7 @@ EOF
 
     - name: Publish API for Production
       run: |
-        # Project file is in root directory, NOT in a subfolder
+        # Project file is in the root directory
         dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
 
     - name: Prepare deployment package
