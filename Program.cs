@@ -11,7 +11,6 @@ using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configure Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.WithProperty("Application", "FileStorageAPI")
@@ -20,11 +19,9 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// 2. Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 3. Configure Swagger
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -34,7 +31,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Production-ready file storage API with MongoDB"
     });
 
-    // Add client credentials authentication to swagger
     c.AddSecurityDefinition("ClientId", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.ApiKey,
@@ -78,15 +74,12 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 4. Configure MongoDB settings
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDbContext>();
 
-// 5. Add application services
 builder.Services.AddScoped<IFileService, FileService>();
 
-// 6. Configure CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
@@ -99,20 +92,16 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 7. Configure response caching
 builder.Services.AddResponseCaching();
 
-// 8. Configure health checks
 builder.Services.AddHealthChecks();
 
-// 9. Configure JSON options
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     options.SerializerOptions.WriteIndented = true;
 });
 
-// 10. Configure form options for file uploads
 builder.Services.Configure<FormOptions>(options =>
 {
     options.ValueLengthLimit = int.MaxValue;
@@ -122,7 +111,6 @@ builder.Services.Configure<FormOptions>(options =>
 
 var app = builder.Build();
 
-// 11. Configure pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -140,15 +128,10 @@ else
 app.UseHttpsRedirection();
 app.UseResponseCaching();
 app.UseCors("AllowSpecificOrigins");
-
-// Serve static files (for uploaded files)
 app.UseStaticFiles();
-
-// Custom middleware
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<ClientAuthMiddleware>();
 
-// Serilog request logging
 app.UseSerilogRequestLogging(options =>
 {
     options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
@@ -162,10 +145,8 @@ app.UseSerilogRequestLogging(options =>
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// 12. Create uploads directory if it doesn't exist (Fixed version)
 var uploadsPath = Path.Combine(app.Environment.WebRootPath ?? app.Environment.ContentRootPath, "uploads");
 
-// Ensure wwwroot exists if using WebRootPath
 if (app.Environment.WebRootPath == null)
 {
     var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
@@ -183,7 +164,6 @@ if (!Directory.Exists(uploadsPath))
     Log.Information("Created uploads directory at {Path}", uploadsPath);
 }
 
-// 13. Seed database with sample client (Run once)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
@@ -191,7 +171,6 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        // Check if client exists
         var existingClient = await db.Clients.Find(c => c.ClientId == "autonext_web_app").FirstOrDefaultAsync();
         if (existingClient == null)
         {
@@ -202,10 +181,10 @@ using (var scope = app.Services.CreateScope())
                 ClientSecret = hashedSecret,
                 ClientName = "Autonext Web Application",
                 CreatedAt = DateTime.UtcNow,
-                StorageQuota = 5_368_709_120, // 5GB
+                StorageQuota = 5_368_709_120,
                 UsedStorage = 0,
                 AllowedFileTypes = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".pdf", ".mp4", ".mov", ".zip", ".doc", ".docx" },
-                MaxFileSize = 104_857_600, // 100MB
+                MaxFileSize = 104_857_600,
                 RateLimitPerMinute = 200,
                 IsActive = true,
                 IpWhitelist = new List<string>(),
@@ -227,7 +206,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// 14. Run application
 try
 {
     Log.Information("Starting up the File Storage API");
