@@ -1,0 +1,165 @@
+name: Deploy AutoNext.Platform.Blob.API to Dev and Production
+on:
+  pull_request:
+    types: [closed]
+    branches: [ master, main ]
+
+jobs:
+  # ==================== DEPLOY TO DEVELOPMENT ====================
+  deploy-dev:
+    if: github.event.pull_request.merged == true
+    runs-on: windows-latest
+    environment: Development
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish API for Development
+      run: |
+        dotnet publish AutoNext.Platform.Blob.API/AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
+
+    - name: Prepare deployment package
+      shell: bash
+      run: |
+        if [ ! -f "./publish/dev/web.config" ]; then
+          cat > ./publish/dev/web.config << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <system.webServer>
+            <handlers>
+              <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+            </handlers>
+            <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
+            <httpProtocol>
+              <customHeaders>
+                <add name="X-Content-Type-Options" value="nosniff" />
+                <add name="X-Frame-Options" value="DENY" />
+                <add name="X-XSS-Protection" value="1; mode=block" />
+              </customHeaders>
+            </httpProtocol>
+            <security>
+              <requestFiltering>
+                <requestLimits maxAllowedContentLength="104857600" />
+              </requestFiltering>
+            </security>
+          </system.webServer>
+        </configuration>
+        EOF
+        fi
+        echo "Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > ./publish/dev/deployment-info.txt
+
+    - name: Deploy to Dev Environment via FTP
+      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./publish/dev/
+        server-dir: ${{ secrets.FTP_DEV_PATH }}/
+        port: 21
+        timeout: 120000
+        retry: 5
+        retry-delay: 5000
+        log: verbose
+        state-name: .ftp-deploy-sync-state-dev.json
+        exclude: |
+          Logs/**
+          wwwroot/uploads/**
+          *.log
+          *.ldf
+          *.mdf
+
+  # ==================== DEPLOY TO PRODUCTION ====================
+  deploy-production:
+    if: github.event.pull_request.merged == true
+    runs-on: windows-latest
+    environment: Production
+    needs: deploy-dev
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish API for Production
+      run: |
+        dotnet publish AutoNext.Platform.Blob.API/AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
+
+    - name: Prepare deployment package
+      shell: bash
+      run: |
+        if [ ! -f "./publish/prod/web.config" ]; then
+          cat > ./publish/prod/web.config << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <system.webServer>
+            <handlers>
+              <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+            </handlers>
+            <aspNetCore processPath="dotnet" arguments=".\AutoNext.Platform.Blob.API.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess" />
+            <httpProtocol>
+              <customHeaders>
+                <add name="X-Content-Type-Options" value="nosniff" />
+                <add name="X-Frame-Options" value="DENY" />
+                <add name="X-XSS-Protection" value="1; mode=block" />
+              </customHeaders>
+            </httpProtocol>
+            <security>
+              <requestFiltering>
+                <requestLimits maxAllowedContentLength="104857600" />
+              </requestFiltering>
+            </security>
+          </system.webServer>
+        </configuration>
+        EOF
+        fi
+        echo "Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > ./publish/prod/deployment-info.txt
+
+    - name: Deploy to Production Environment via FTP
+      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./publish/prod/
+        server-dir: ${{ secrets.FTP_PROD_PATH }}/
+        port: 21
+        timeout: 120000
+        retry: 5
+        retry-delay: 5000
+        log: verbose
+        state-name: .ftp-deploy-sync-state-prod.json
+        exclude: |
+          Logs/**
+          wwwroot/uploads/**
+          *.log
+          *.ldf
+          *.mdf
+
+    - name: Verify deployment
+      shell: bash
+      run: |
+        echo "=========================================="
+        echo "Deployment completed to Windows Shared Server"
+        echo "URL: https://autonext-blob.services.azurewebsites.betalen.in"
+        echo "Health Check: https://autonext-blob.services.azurewebsites.betalen.in/health"
+        echo "Swagger UI: https://autonext-blob.services.azurewebsites.betalen.in/swagger"
+        echo "=========================================="
+        sleep 10
+        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "Health check pending - application may still be starting"
