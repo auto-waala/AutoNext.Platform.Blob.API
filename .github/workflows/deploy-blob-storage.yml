@@ -21,11 +21,20 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
+    - name: List files for debugging
+      shell: powershell
+      run: |
+        Write-Host "Current directory contents:" -ForegroundColor Green
+        Get-ChildItem
+        Write-Host "`nLooking for csproj files:" -ForegroundColor Green
+        Get-ChildItem -Filter "*.csproj"
+
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Publish API for Development
       run: |
+        # IMPORTANT: Project file is at ROOT level, not in a subfolder
         dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
 
     - name: Prepare deployment package
@@ -100,6 +109,7 @@ EOF
 
     - name: Publish API for Production
       run: |
+        # IMPORTANT: Project file is at ROOT level, not in a subfolder
         dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
 
     - name: Prepare deployment package
@@ -163,12 +173,4 @@ EOF
         echo "URL: https://autonext-blob.services.azurewebsites.betalen.in"
         echo "Health Check: https://autonext-blob.services.azurewebsites.betalen.in/health"
         echo "Swagger UI: https://autonext-blob.services.azurewebsites.betalen.in/swagger"
-        echo "=========================================="
-        echo ""
-        echo "Waiting for application to start..."
-        sleep 15
-        echo ""
-        echo "Testing health endpoint:"
-        curl -I https://autonext-blob.services.azurewebsites.betalen.in/health || echo "⚠️ Health check pending - application may still be starting"
-        echo ""
         echo "=========================================="
