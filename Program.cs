@@ -84,7 +84,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("https://autonext-blob.services.azurewebsites.betalen.in", "https://localhost:3000", "http://localhost:3000")
+        policy.WithOrigins(
+                "https://autonext-blob-dev.services.azurewebsites.betalen.in",
+                "https://autonext-blob.services.azurewebsites.betalen.in",
+                "https://autonext-gateway-dev.services.azurewebsites.betalen.in",
+                "https://autonext-gateway-prod.services.azurewebsites.betalen.in",
+                "https://localhost:3000",
+                "http://localhost:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials()
@@ -98,7 +104,7 @@ builder.Services.AddHealthChecks();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     options.SerializerOptions.WriteIndented = true;
 });
 
@@ -111,26 +117,24 @@ builder.Services.Configure<FormOptions>(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Autonext File Storage API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
-else
-{
-    app.UseHsts();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Autonext File Storage API v1");
+    c.RoutePrefix = "swagger";
+});
 
+app.UseHsts();
 app.UseHttpsRedirection();
 app.UseResponseCaching();
 app.UseCors("AllowSpecificOrigins");
 app.UseStaticFiles();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-app.UseMiddleware<ClientAuthMiddleware>();
+
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/swagger"),
+    appBuilder => appBuilder.UseMiddleware<ClientAuthMiddleware>()
+);
 
 app.UseSerilogRequestLogging(options =>
 {
@@ -151,9 +155,8 @@ if (app.Environment.WebRootPath == null)
 {
     var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
     if (!Directory.Exists(wwwrootPath))
-    {
         Directory.CreateDirectory(wwwrootPath);
-    }
+
     app.Environment.WebRootPath = wwwrootPath;
     uploadsPath = Path.Combine(app.Environment.WebRootPath, "uploads");
 }
@@ -171,7 +174,10 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        var existingClient = await db.Clients.Find(c => c.ClientId == "autonext_web_app").FirstOrDefaultAsync();
+        var existingClient = await db.Clients
+            .Find(c => c.ClientId == "autonext_web_app")
+            .FirstOrDefaultAsync();
+
         if (existingClient == null)
         {
             var hashedSecret = BCrypt.Net.BCrypt.HashPassword("a6cb4b9a-35a7-418d-bb8e-0c4a5527684b", 12);
@@ -183,20 +189,26 @@ using (var scope = app.Services.CreateScope())
                 CreatedAt = DateTime.UtcNow,
                 StorageQuota = 5_368_709_120,
                 UsedStorage = 0,
-                AllowedFileTypes = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".pdf", ".mp4", ".mov", ".zip", ".doc", ".docx" },
+                AllowedFileTypes = new List<string>
+                {
+                    ".jpg", ".jpeg", ".png", ".gif",
+                    ".pdf", ".mp4", ".mov", ".zip",
+                    ".doc", ".docx"
+                },
                 MaxFileSize = 104_857_600,
                 RateLimitPerMinute = 200,
                 IsActive = true,
                 IpWhitelist = new List<string>(),
                 Environment = app.Environment.EnvironmentName
             };
+
             await db.Clients.InsertOneAsync(client);
             logger.LogInformation("Sample client created with ClientId: autonext_web_app");
 
             Console.WriteLine("=".PadRight(50, '='));
             Console.WriteLine("Sample Client Created:");
-            Console.WriteLine($"Client ID: autonext_web_app");
-            Console.WriteLine($"Client Secret: a6cb4b9a-35a7-418d-bb8e-0c4a5527684b");
+            Console.WriteLine($"Client ID     : autonext_web_app");
+            Console.WriteLine($"Client Secret : a6cb4b9a-35a7-418d-bb8e-0c4a5527684b");
             Console.WriteLine("=".PadRight(50, '='));
         }
     }
@@ -209,6 +221,13 @@ using (var scope = app.Services.CreateScope())
 try
 {
     Log.Information("Starting up the File Storage API");
+
+    foreach (var url in app.Urls)
+    {
+        Log.Information("Listening on: {Url}", url);
+    }
+    Log.Information("Swagger UI: {Url}", "http://localhost:<PORT>/swagger");
+
     await app.RunAsync();
 }
 catch (Exception ex)
