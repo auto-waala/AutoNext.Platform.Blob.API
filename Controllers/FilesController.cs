@@ -20,14 +20,8 @@ namespace AutoNext.Platform.Blob.API.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// Upload a file
-        /// </summary>
-        /// <param name="file">File to upload</param>
-        /// <param name="metadata">Optional custom metadata as JSON string</param>
-        /// <returns>File metadata response</returns>
         [HttpPost("upload")]
-        [RequestSizeLimit(100_000_000)] // 100MB
+        [RequestSizeLimit(100_000_000)]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(FileUploadResponseDto), 201)]
         [ProducesResponseType(typeof(ErrorResponseDto), 400)]
@@ -44,7 +38,6 @@ namespace AutoNext.Platform.Blob.API.Controllers
             _logger.LogInformation("Upload request from client: {ClientId}, file: {FileName}",
                 client.ClientId, file.FileName);
 
-            // Parse metadata if provided
             Dictionary<string, string>? metadataDict = null;
             if (!string.IsNullOrEmpty(metadata))
             {
@@ -61,11 +54,6 @@ namespace AutoNext.Platform.Blob.API.Controllers
             });
         }
 
-        /// <summary>
-        /// Get file metadata
-        /// </summary>
-        /// <param name="id">File ID</param>
-        /// <returns>File metadata</returns>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(FileMetadata), 200)]
         [ProducesResponseType(typeof(ErrorResponseDto), 404)]
@@ -80,11 +68,6 @@ namespace AutoNext.Platform.Blob.API.Controllers
             return Ok(new { success = true, data = metadata });
         }
 
-        /// <summary>
-        /// Download a file
-        /// </summary>
-        /// <param name="id">File ID</param>
-        /// <returns>File stream</returns>
         [HttpGet("{id}/download")]
         [ProducesResponseType(200)]
         [ProducesResponseType(typeof(ErrorResponseDto), 404)]
@@ -96,11 +79,6 @@ namespace AutoNext.Platform.Blob.API.Controllers
             return File(stream, contentType, fileName);
         }
 
-        /// <summary>
-        /// Delete a file
-        /// </summary>
-        /// <param name="id">File ID</param>
-        /// <returns>Success indicator</returns>
         [HttpDelete("{id}")]
         [ProducesResponseType(200)]
         [ProducesResponseType(typeof(ErrorResponseDto), 404)]
@@ -115,12 +93,6 @@ namespace AutoNext.Platform.Blob.API.Controllers
             return Ok(new { success = true, message = "File deleted successfully" });
         }
 
-        /// <summary>
-        /// List files for the authenticated client
-        /// </summary>
-        /// <param name="page">Page number</param>
-        /// <param name="pageSize">Items per page</param>
-        /// <returns>List of files</returns>
         [HttpGet]
         [ProducesResponseType(typeof(List<FileMetadata>), 200)]
         public async Task<IActionResult> ListFiles(int page = 1, int pageSize = 50)
