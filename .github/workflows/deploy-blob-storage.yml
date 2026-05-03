@@ -21,13 +21,21 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
+    - name: Debug - List files
+      shell: powershell
+      run: |
+        Write-Host "Current directory contents:" -ForegroundColor Green
+        Get-ChildItem -Name
+        Write-Host "`nLooking for csproj:" -ForegroundColor Green
+        Get-ChildItem -Filter "*.csproj" | Select-Object Name
+
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Publish API for Development
       run: |
-        # CORRECTED: Project file is in the ROOT directory
-        dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/dev -p:EnvironmentName=Development
+        # IMPORTANT: Let dotnet find the project file automatically
+        dotnet publish --configuration Release --output ./publish/dev -p:EnvironmentName=Development
 
     - name: Prepare deployment package
       shell: bash
@@ -77,8 +85,6 @@ EOF
           Logs/**
           wwwroot/uploads/**
           *.log
-          *.ldf
-          *.mdf
 
   # ==================== DEPLOY TO PRODUCTION ====================
   deploy-production:
@@ -101,8 +107,8 @@ EOF
 
     - name: Publish API for Production
       run: |
-        # CORRECTED: Project file is in the ROOT directory
-        dotnet publish AutoNext.Platform.Blob.API.csproj --configuration Release --output ./publish/prod -p:EnvironmentName=Production
+        # IMPORTANT: Let dotnet find the project file automatically
+        dotnet publish --configuration Release --output ./publish/prod -p:EnvironmentName=Production
 
     - name: Prepare deployment package
       shell: bash
@@ -152,16 +158,12 @@ EOF
           Logs/**
           wwwroot/uploads/**
           *.log
-          *.ldf
-          *.mdf
 
     - name: Verify deployment
       shell: bash
       run: |
         echo "=========================================="
-        echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY"
+        echo "✅ DEPLOYMENT COMPLETED"
         echo "=========================================="
         echo "URL: https://autonext-blob.services.azurewebsites.betalen.in"
-        echo "Health Check: https://autonext-blob.services.azurewebsites.betalen.in/health"
-        echo "Swagger UI: https://autonext-blob.services.azurewebsites.betalen.in/swagger"
         echo "=========================================="
